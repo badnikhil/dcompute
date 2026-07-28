@@ -25,6 +25,7 @@ version(DComputeTestOpenCL)
 else version(DComputeTestCUDA) {
     import dcompute.driver.cuda.unified_buffer;
     import dcompute.driver.cuda;
+    import dcompute.tests.pitched;
 }
 else
     static assert(false, "Need to test something!");
@@ -34,6 +35,16 @@ enum CL_PLATFORM_INDEX = 2;
 
 int main(string[] args)
 {
+    version(DComputeTestCUDA)
+    {
+        // WORKAROUND: runtime.d's module constructors are gated behind
+        // version(LDC_DCompute_CUDA), which no build config defines, so the
+        // default platform/context are never initialised before main() and the
+        // first Buffer constructed ahead of launch! fails with invalidContext.
+        // Initialise explicitly here until the gate is fixed.
+        ensureInit();
+    }
+
     enum size_t N = 128;
     float alpha = 5.0;
     float[N] res, x,y;
@@ -190,6 +201,9 @@ int main(string[] args)
                 writeln("\nDevice does not support Unified Memory — skipping UnifiedBuffer test.");
             }
         }
+
+        // 3. Pitched memory / 2D & 3D copies / device memset
+        runPitchedTests();
         }
         else
         {
