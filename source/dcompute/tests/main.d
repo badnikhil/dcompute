@@ -34,6 +34,22 @@ enum CL_PLATFORM_INDEX = 2;
 
 int main(string[] args)
 {
+    version(DComputeTestCUDA)
+    {
+        // dcompute.driver.cuda.runtime's module constructors are gated on
+        // version(LDC_DCompute_CUDA), which LDC only predefines from 1.43
+        // (D frontend 2.113) onwards.  Nothing above this point has touched
+        // the driver, so a live default Queue can only exist if
+        // `static this()` actually ran — i.e. the identifier really is
+        // defined for this build.  Guards against a build configuration that
+        // silently compiles both constructors to nothing, which leaves every
+        // bindbc function pointer null and segfaults at the first Buffer.
+        static if (__VERSION__ >= 2113)
+            enforce(defaultQueue().raw !is null,
+                    "CUDA runtime module constructors did not run: automatic " ~
+                    "initialisation is disabled for this build configuration.");
+    }
+
     enum size_t N = 128;
     float alpha = 5.0;
     float[N] res, x,y;
