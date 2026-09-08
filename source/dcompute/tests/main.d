@@ -34,6 +34,20 @@ enum CL_PLATFORM_INDEX = 2;
 
 int main(string[] args)
 {
+    version(DComputeTestCUDA)
+    {
+        // dcompute.driver.cuda.runtime's module constructors are gated on
+        // version(LDC_DCompute_CUDA).  Nothing above this point has touched
+        // the driver, so a live default Queue can only exist if
+        // `static this()` actually ran — i.e. the identifier really is
+        // defined for this build.  Guards against a build configuration that
+        // silently compiles both constructors to nothing, which leaves every
+        // bindbc function pointer null and segfaults at the first Buffer.
+        enforce(defaultQueue().raw !is null,
+                "CUDA runtime module constructors did not run: automatic " ~
+                "initialisation is disabled (dead version gate in runtime.d).");
+    }
+
     enum size_t N = 128;
     float alpha = 5.0;
     float[N] res, x,y;
