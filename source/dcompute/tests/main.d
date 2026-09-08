@@ -25,6 +25,7 @@ version(DComputeTestOpenCL)
 else version(DComputeTestCUDA) {
     import dcompute.driver.cuda.unified_buffer;
     import dcompute.driver.cuda;
+    import dcompute.tests.pitched;
 }
 else
     static assert(false, "Need to test something!");
@@ -206,6 +207,9 @@ int main(string[] args)
                 writeln("\nDevice does not support Unified Memory — skipping UnifiedBuffer test.");
             }
         }
+
+        // 3. Pitched memory / 2D & 3D copies / device memset
+        runPitchedTests();
         }
         else
         {
