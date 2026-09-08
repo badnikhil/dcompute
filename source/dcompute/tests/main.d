@@ -35,16 +35,6 @@ enum CL_PLATFORM_INDEX = 2;
 
 int main(string[] args)
 {
-    version(DComputeTestCUDA)
-    {
-        // WORKAROUND: runtime.d's module constructors are gated behind
-        // version(LDC_DCompute_CUDA), which no build config defines, so the
-        // default platform/context are never initialised before main() and the
-        // first Buffer constructed ahead of launch! fails with invalidContext.
-        // Initialise explicitly here until the gate is fixed.
-        ensureInit();
-    }
-
     enum size_t N = 128;
     float alpha = 5.0;
     float[N] res, x,y;
