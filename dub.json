@@ -6,7 +6,7 @@
     "license": "BSL-1.0",
     "dependencies": {
         "derelict-cl"  : "~>3.2.0",
-        "bindbc-cuda": "~>0.1.0",
+        "bindbc-cuda": "~>0.2.0",
         "taggedalgebraic": "~>0.10.7"
     },
     "configurations": [
