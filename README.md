@@ -65,12 +65,17 @@ Alternatively, you can include dcompute as a dependency, as shown below:
     ```
     to your `dub.json` under `dependencies`. You should include the following dub flags under `dflags-ldc`, which are passed to the compiler:
 	```json
-	"dflags-ldc": ["-mdcompute-targets=cuda-800","-mdcompute-targets=ocl-300","-version=LDC_DCompute","-oq"],
+	"dflags-ldc": ["-mdcompute-targets=cuda-800","-mdcompute-targets=ocl-300","-oq"],
 	```
 	The dflags will be passed to LDC to generate code for the specified targets. You can run `ldc2 --help` to look for that flag. Use `ocl-xy0` for OpenCL x.y and `cuda-xy0` for CUDA Compute Capability x.y. So the above flags are for OpenCL 3.0 and CUDA CC 8.0. The two flags must be included separately as shown above.
     * If you get an error saying `Need to use a DCompute enabled compiler`, you likely forgot the `-mdcompute-targets` flags.
     * Check NVIDIA's [website](https://developer.nvidia.com/cuda-gpus) for your CUDA Compute Capability.
-  * Alternatively add the equivalent to dub.sdl, `dependency "dcompute" version="~>0.1.1"` to your `dub.sdl` and include the dflags.
+  * **`dflags` are not inherited by dependencies.** `-mdcompute-targets` therefore never reaches the `dcompute` package itself, so LDC does not predefine `LDC_DCompute` / `LDC_DCompute_CUDA` while compiling it. If you use the CUDA backend, select the `library-cuda` configuration, which defines them:
+	```json
+	"subConfigurations": { "dcompute": "library-cuda" },
+	```
+	Without this the module constructors in `dcompute.driver.cuda.runtime` compile to nothing, the default `Platform`/`Device`/`Context`/`Queue` are never created, and the first `Buffer` you construct calls an unbound CUDA driver function pointer and segfaults. Equivalently, you can define the identifiers yourself with a top-level `"versions": ["LDC_DCompute","LDC_DCompute_CUDA"]`, which — unlike `dflags` — *is* inherited by dependencies.
+  * Alternatively add the equivalent to dub.sdl, `dependency "dcompute" version="~>0.1.1"` to your `dub.sdl`, the dflags, and `subConfiguration "dcompute" "library-cuda"`.
 
 
 If you get an error like `Error: unrecognized switch '-mdcompute-targets=cuda-210`, make sure you are using LDC and not DMD: passing `--compiler=/path/to/ldc2` to dub will force it to use `/path/to/ldc2` as the D compiler.

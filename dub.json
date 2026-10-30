@@ -16,6 +16,12 @@
             "excludedSourceFiles": ["source/dcompute/tests/*"],
         },
         {
+            "name": "library-cuda",
+            "targetType": "library",
+            "excludedSourceFiles": ["source/dcompute/tests/*"],
+            "versions": ["LDC_DCompute", "LDC_DCompute_CUDA"],
+        },
+        {
             "name": "unittest",
             "dflags": ["-mdcompute-targets=cuda-800", "-oq"],
             "targetType": "executable",
