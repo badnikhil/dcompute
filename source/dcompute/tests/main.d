@@ -25,6 +25,7 @@ version(DComputeTestOpenCL)
 else version(DComputeTestCUDA) {
     import dcompute.driver.cuda.unified_buffer;
     import dcompute.driver.cuda;
+    import dcompute.tests.pitched;
     import dcompute.tests.ndview;
 }
 else
@@ -192,7 +193,9 @@ int main(string[] args)
             }
         }
 
-        // 3. NdView!(T,N): strided c = a + b on non-contiguous 2-D views
+        // 3. Pitched memory / 2D & 3D copies / device memset
+        runPitchedTests();
+        // 4. NdView!(T,N): strided c = a + b on non-contiguous 2-D views
         writeln("\nNdView strided-add test...");
         runNdViewTests();
         }

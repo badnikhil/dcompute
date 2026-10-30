@@ -34,12 +34,130 @@ struct Buffer(T)
         }
         checkErrors();
     }
-    alias hostArgOf(U : GlobalPointer!T) = raw; 
+    /// Fill the buffer with `value` on the device (cuMemsetD8/D16/D32,
+    /// chosen by T.sizeof). Fills the whole allocation backing `raw`;
+    /// the element count is queried from the driver so both constructors
+    /// are supported.
+    void memset(T value)
+    {
+        size_t base, nbytes;
+        status = cast(Status)cuMemGetAddressRange(&base,&nbytes,raw);
+        checkErrors();
+        static if (T.sizeof == 1)
+            status = cast(Status)cuMemsetD8(raw, *cast(ubyte*)&value, nbytes);
+        else static if (T.sizeof == 2)
+            status = cast(Status)cuMemsetD16(raw, *cast(ushort*)&value, nbytes / 2);
+        else static if (T.sizeof == 4)
+            status = cast(Status)cuMemsetD32(raw, *cast(uint*)&value, nbytes / 4);
+        else
+            static assert(false, "memset requires a 1-, 2- or 4-byte element type");
+        checkErrors();
+    }
+    alias hostArgOf(U : GlobalPointer!T) = raw;
     void release()
     {
         status = cast(Status)cuMemFree(raw);
         checkErrors();
         raw = 0;
+        hostMemory = null;
+    }
+}
+
+/**
+ * 2D device buffer backed by a pitched allocation (cuMemAllocPitch).
+ *
+ * Rows are `width` elements wide; row `y` starts at `raw + y * pitch`,
+ * where `pitch >= width * T.sizeof` is chosen by the driver to satisfy the
+ * device's alignment/coalescing requirements.
+ *
+ * `hostMemory` is a dense row-major slice (length == width * height);
+ * copy!() converts between the dense host layout and the pitched device
+ * layout with a single cuMemcpy2D.
+ *
+ * Cleanup is manual via release(), matching Buffer.
+ */
+struct PitchedBuffer(T)
+{
+    size_t raw;    // CUdeviceptr of the pitched allocation
+    size_t pitch;  // byte offset between the starts of consecutive rows
+    size_t width;  // elements per row
+    size_t height; // number of rows
+
+	// Dense row-major host memory associated with this buffer
+    T[] hostMemory;
+
+    this(size_t width, size_t height)
+    {
+        // cuMemAllocPitch only accepts 4, 8 or 16 as the element size hint;
+        // pass T.sizeof when it is one of those, otherwise fall back to 4.
+        enum uint elementSize =
+            (T.sizeof == 8 || T.sizeof == 16) ? cast(uint)T.sizeof : 4u;
+        this.width  = width;
+        this.height = height;
+        status = cast(Status)cuMemAllocPitch(&raw,&pitch,width * T.sizeof,
+                                             height,elementSize);
+        checkErrors();
+        hostMemory = null;
+    }
+
+    this(T[] arr, size_t width)
+    {
+        assert(width > 0 && arr.length % width == 0,
+               "array length must be a multiple of the row width");
+        this(width, arr.length / width);
+        hostMemory = arr;
+    }
+
+    void copy(Copy c)()
+    {
+        CUDA_MEMCPY2D desc; // zero-initialised; unused fields must stay 0/null
+        desc.WidthInBytes = width * T.sizeof;
+        desc.Height       = height;
+        static if (c == Copy.hostToDevice)
+        {
+            desc.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
+            desc.srcHost       = hostMemory.ptr;
+            desc.srcPitch      = width * T.sizeof;
+            desc.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_DEVICE;
+            desc.dstDevice     = raw;
+            desc.dstPitch      = pitch;
+        }
+        else static if (c == Copy.deviceToHost)
+        {
+            desc.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_DEVICE;
+            desc.srcDevice     = raw;
+            desc.srcPitch      = pitch;
+            desc.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
+            desc.dstHost       = hostMemory.ptr;
+            desc.dstPitch      = width * T.sizeof;
+        }
+        copy2D(desc);
+    }
+
+    /// Fill the `width` elements of every row with `value` on the device
+    /// (cuMemsetD2D8/D2D16/D2D32, chosen by T.sizeof). Padding bytes
+    /// between rows are left untouched.
+    void memset(T value)
+    {
+        static if (T.sizeof == 1)
+            status = cast(Status)cuMemsetD2D8(raw, pitch, *cast(ubyte*)&value, width, height);
+        else static if (T.sizeof == 2)
+            status = cast(Status)cuMemsetD2D16(raw, pitch, *cast(ushort*)&value, width, height);
+        else static if (T.sizeof == 4)
+            status = cast(Status)cuMemsetD2D32(raw, pitch, *cast(uint*)&value, width, height);
+        else
+            static assert(false, "memset requires a 1-, 2- or 4-byte element type");
+        checkErrors();
+    }
+
+    void release()
+    {
+        status = cast(Status)cuMemFree(raw);
+        checkErrors();
+        raw = 0;
+        pitch = 0;
+        width = 0;
+        height = 0;
         hostMemory = null;
     }
 }
