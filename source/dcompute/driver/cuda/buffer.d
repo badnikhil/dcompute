@@ -38,6 +38,7 @@ struct Buffer(T)
     /// chosen by T.sizeof). Fills the whole allocation backing `raw`;
     /// the element count is queried from the driver so both constructors
     /// are supported.
+    static if (T.sizeof <= 4)
     void memset(T value)
     {
         size_t base, nbytes;
@@ -49,8 +50,6 @@ struct Buffer(T)
             status = cast(Status)cuMemsetD16(raw, *cast(ushort*)&value, nbytes / 2);
         else static if (T.sizeof == 4)
             status = cast(Status)cuMemsetD32(raw, *cast(uint*)&value, nbytes / 4);
-        else
-            static assert(false, "memset requires a 1-, 2- or 4-byte element type");
         checkErrors();
     }
     alias hostArgOf(U : GlobalPointer!T) = raw;
@@ -137,6 +136,7 @@ struct PitchedBuffer(T)
     /// Fill the `width` elements of every row with `value` on the device
     /// (cuMemsetD2D8/D2D16/D2D32, chosen by T.sizeof). Padding bytes
     /// between rows are left untouched.
+    static if (T.sizeof <= 4)
     void memset(T value)
     {
         static if (T.sizeof == 1)
@@ -145,8 +145,6 @@ struct PitchedBuffer(T)
             status = cast(Status)cuMemsetD2D16(raw, pitch, *cast(ushort*)&value, width, height);
         else static if (T.sizeof == 4)
             status = cast(Status)cuMemsetD2D32(raw, pitch, *cast(uint*)&value, width, height);
-        else
-            static assert(false, "memset requires a 1-, 2- or 4-byte element type");
         checkErrors();
     }
 
